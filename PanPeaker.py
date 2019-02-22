@@ -1,8 +1,18 @@
 
-import os
 import argparse
 import logging
-import with_control
+import peak_calling_with_control as call_ctl
+
+#TODO allow for different bam files for PureCLIP and Piranha
+
+#########################
+##   NECESSARY TOOLS   ##
+#########################
+
+# PEAKachu
+# Piranha
+# PureCLIP
+# bedtools
 
 ####################
 ##   ARGS INPUT   ##
@@ -88,6 +98,16 @@ parser.add_argument(
     metavar='int',
     default='1',
     help="Threads for PureCLIP")
+parser.add_argument(
+    "--signal_bam_peakachu",
+    metavar='*.bam',
+    nargs="+",
+    help="List of paths to the signal bam files for PEAKachu.")
+parser.add_argument(
+    "--control_bam_peakachu",
+    metavar='*.bam',
+    nargs="+",
+    help="List of paths to the signal bam files for PEAKachu.")
 
 ######################
 ##   CHECKS INPUT   ##
@@ -114,6 +134,7 @@ logging.info("")
 ##   CODE BODY   ##
 ###################
 
+# check if controls are provided
 bool_control = 1
 if( args.input_control_bam ):
     bool_control = 0
@@ -121,6 +142,16 @@ if( args.input_control_bam ):
 else:
     print("[NOTE] Controls not provided")
 
-with_control.peakcalling(args.input_signal_bam, args.input_signal_bai, args.input_control_bam, args.input_control_bai,
-                         args.genome_file, args.output_folder, args.output_name, args.peakachu, args.piranha,
-                         args.pureclip, args.threads)
+# define input for PEAKachu base don user choice
+signal_bam_files_peakachu = args.input_signal_bam
+control_bam_files_peakachu = args.input_control_bam
+if( args.signal_bam_peakachu ):
+    signal_bam_files_peakachu = args.signal_bam_peakachu
+if( args.control_bam_peakachu ):
+    control_bam_files_peakachu = args.control_bam_peakachu
+
+if(bool_control):
+    call_ctl.peakcalling_pureclip(args.input_signal_bam, args.input_signal_bai, args.input_control_bam,
+                                  args.input_control_bai, args.genome_file, args.output_folder, args.pureclip,
+                                  args.threads)
+
