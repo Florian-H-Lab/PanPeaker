@@ -1,6 +1,7 @@
 
 import argparse
 import logging
+import os
 import peak_calling_with_control as call_ctl
 
 #TODO allow for different bam files for PureCLIP and Piranha
@@ -69,13 +70,14 @@ parser.add_argument(
     nargs="+",
     help="List of paths to the control bam files.")
 parser.add_argument(
-    "-k" "--input_control_bai",
+    "-k", "--input_control_bai",
     metavar='*.bai',
     nargs="+",
     help="List of paths to the control bai files.")
 parser.add_argument(
     "-o", "--output_folder",
     metavar='path/',
+    default=os.getcwd(),
     help="Write results to this path.")
 parser.add_argument(
     "-s", "--output_name",
@@ -84,19 +86,22 @@ parser.add_argument(
 parser.add_argument(
     "--peakachu",
     metavar='...',
+    default="",
     help="Parameter list for PEAKachu")
 parser.add_argument(
     "--piranha",
     metavar='...',
+    default="",
     help="Parameter list for Piranha")
 parser.add_argument(
     "--pureclip",
     metavar='...',
+    default="",
     help="Parameter list for PureCLIP")
 parser.add_argument(
-    "--threads",
+    "-nt", "--threads",
     metavar='int',
-    default='1',
+    default="1",
     help="Threads for PureCLIP")
 parser.add_argument(
     "--signal_bam_peakachu",
@@ -150,8 +155,12 @@ if( args.signal_bam_peakachu ):
 if( args.control_bam_peakachu ):
     control_bam_files_peakachu = args.control_bam_peakachu
 
-if(bool_control):
-    call_ctl.peakcalling_pureclip(args.input_signal_bam, args.input_signal_bai, args.input_control_bam,
-                                  args.input_control_bai, args.genome_file, args.output_folder, args.pureclip,
-                                  args.threads)
+if( bool_control == 0 ):
+    # print("[NOTE] Running PureCLIP")
+    # call_ctl.peakcalling_pureclip(args.input_signal_bam, args.input_signal_bai, args.input_control_bam,
+    #                               args.input_control_bai, args.genome_file, args.output_folder, args.pureclip.strip("\""),
+    #                               args.threads)
 
+    print("[NOTE] Running Piranha")
+    call_ctl.peakcalling_piranha(args.input_signal_bam, args.input_control_bam,
+                                 args.output_folder, args.piranha.strip("\""))
