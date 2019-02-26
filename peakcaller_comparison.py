@@ -3,6 +3,10 @@ import subprocess as sb
 import matplotlib.pyplot as plt
 import os
 import random
+import numpy
+import scipy.stats as sci
+import statsmodels.stats.multitest as multi
+
 from matplotlib_venn import venn3
 
 def ensure_dir(file_path):
@@ -29,13 +33,17 @@ def generate_count_file(afile, bfile, cfile, label, outputpath):
     for line in file_ab:
         data = line.split("\t")
 
+        # +1 to account for the peak itself
         if data[3] not in peak_dict:
-            peak_dict[data[3]] = data[6]
+            peak_dict[data[3]] = data[6] + 1
 
     for line in file_ac:
         data = line.split("\t")
 
+        # +1 to account for the peak itself
         if data[3] not in peak_dict:
+            peak_dict[data[3]] = data[6] + 1
+        else:
             peak_dict[data[3]] = peak_dict[data[3]] + data[6]
 
     return(peak_dict)
@@ -91,7 +99,7 @@ def idr(outputpath, seed, n):
     pseudo_pool_2 = "{}/p2.bed".format(outputpath_tmp)
     pseudo_pool_3 = "{}/p3.bed".format(outputpath_tmp)
 
-    all_peaks = "{}/all_peaks.bed".format(outputpath)
+    all_peaks = "{}/robust_peaks.bed".format(outputpath)
 
     ## Nt = number of peaks consistent between true replicates, we know were the peaks came from, specfic reproducibility
     ## High count only occur for peaks that poverlaps with the same peaks of the other peakcaller or with peaks that
@@ -145,16 +153,58 @@ def idr(outputpath, seed, n):
             Np_Nt_dict[key][i] = Np_dict[key] / Nt_dict[key]
 
     ## Np/Nt < p-val 
-    ## A robust peak should have a high quotient 
+    ## A robust peak should have a high quotient
+    standard_data = sci.norm.rvs(3., 1., size=1000)
+    expected_norm_dist = sci.norm.fit(standard_data)
 
-    ## calcualte normal distribution for each peak of the Np/Nt ... = X
+    # Plot the histogram.
+    plt.hist(expected_norm_dist, bins=25, density=True, alpha=0.6, color='g')
 
-    ## calcualte normal distribuiton of the expected values for Np/Nt throughout all peaks ... = Y
-        # make a plot for the distribution of the expectated value
+    # Plot the PDF.
+    xmin, xmax = plt.xlim()
+    x = numpy.linspace(xmin, xmax, 100)
+    p = sci.norm.pdf(x, 3., 1.)
+    plt.plot(x, p, 'k', linewidth=2)
+    title = "Fit results: mu = %.2f,  std = %.2f" % (3., 1.)
+    plt.title(title)
 
-    ## t-test between X and Y for significance (p-val)
+    # generate p-value dict and distribution of the means
+    pval_dict = dict()
+    mean_list = [-1] * len(Np_Nt_dict.keys())
 
-    ## Benjamin hochberg correctur for multiple hypothesis testing
+    i = 0
+    for key in Np_Nt_dict:
+        mu, std = sci.norm.fit(Np_Nt_dict[key])
+        mean_list[i] = mu
+        i += 1
+        pval_dict[key] = sci.ttest_ind(Np_Nt_dict[key],standard_data)[1]
+
+    # Plot distirbution of means
+    plt.hist(mean_list, bins=25, density=True, alpha=0.6, color='g')
+    xmin, xmax = plt.xlim()
+    x = numpy.linspace(xmin, xmax, 100)
+    mu, std = sci.norm.fit(mean_list)
+    p = sci.norm.pdf(x, mu, std)
+    plt.plot(x, p, 'k', linewidth=2)
+    title = "Fit results: mu = %.2f,  std = %.2f" % (mu, std)
+    plt.title(title)
+
+    # Benjamin hochberg correctur for multiple hypothesis testing
+    pvals_corrected_dict = dict()
+    pvals_corrected = multi.multipletests(pval_dict.values(), alpha=0.05, method='fdr_bh',
+                                          is_sorted=False, returnsorted=False)
+    i = 0
+    for key in pval_dict:
+        pvals_corrected_dict[key] = pvals_corrected[i]
+        i += 1
+
+    # write total output file
+    file_robust_peaks = open(all_peaks, "w")
+    for line in all_peaks:
+        peak_id = line.split("\t")[4]
+        file_robust_peaks.write("{} \t {} \t {} \t {} \n".format(line.strip("\n"), Np_Nt_dict[peak_id],
+                                                                 pval_dict[key], pvals_corrected_dict[key]))
+    file_robust_peaks.close()
 
 def peakcaller_comparison(outputpath):
     options="-wa -s -u"
