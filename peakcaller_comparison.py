@@ -1,4 +1,9 @@
 
+# The script will be used to:
+# a) Generete a Venndiagram to compare the individual peakcallers
+# b) Generate a Robust-Peak-File with all peaks validated for their
+#    robustness (Np/Nt-ratio)
+
 import subprocess as sb
 import matplotlib.pyplot as plt
 import os
