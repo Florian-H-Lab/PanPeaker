@@ -3,6 +3,7 @@ import argparse
 import logging
 import os
 import peak_calling_with_control as call_ctl
+import peakcaller_comparison as peakcomparison
 
 #TODO allow for different bam files for PureCLIP and Piranha
 
@@ -62,6 +63,11 @@ parser.add_argument(
     metavar='*.fa',
     required=True,
     help="Path to genome file (fasta).")
+parser.add_argument(
+    "--chr_sizes",
+    metavar='*.txt',
+    required=True,
+    help="Path to genomes chromosome sizes (txt).")
 
 # optional arguments
 parser.add_argument(
@@ -86,12 +92,12 @@ parser.add_argument(
 parser.add_argument(
     "--peakachu",
     metavar='...',
-    default="",
+    default="--max_insert_size 200 --mad_multiplier 2.0 --fc_cutoff 2.0 --padj_threshold 0.05",
     help="Parameter list for PEAKachu")
 parser.add_argument(
     "--piranha",
     metavar='...',
-    default="",
+    default="-p 0.05",
     help="Parameter list for Piranha")
 parser.add_argument(
     "--pureclip",
@@ -139,6 +145,8 @@ logging.info("")
 ##   CODE BODY   ##
 ###################
 
+print("[START]")
+
 # check if controls are provided
 bool_control = 1
 if( args.input_control_bam ):
@@ -155,12 +163,29 @@ if( args.signal_bam_peakachu ):
 if( args.control_bam_peakachu ):
     control_bam_files_peakachu = args.control_bam_peakachu
 
-if( bool_control == 0 ):
-    # print("[NOTE] Running PureCLIP")
-    # call_ctl.peakcalling_pureclip(args.input_signal_bam, args.input_signal_bai, args.input_control_bam,
-    #                               args.input_control_bai, args.genome_file, args.output_folder, args.pureclip.strip("\""),
-    #                               args.threads)
+# if( bool_control == 0 ):
+#     print("[NOTE] Running PureCLIP")
+#     call_ctl.peakcalling_pureclip(args.input_signal_bam, args.input_signal_bai, args.input_control_bam,
+#                                   args.input_control_bai, args.genome_file, args.chr_sizes, args.output_folder,
+#                                   args.pureclip.strip("\""), args.threads)
+#
+#     print("[NOTE] Running Piranha")
+#     call_ctl.peakcalling_piranha(args.input_signal_bam, args.input_control_bam,
+#                                  args.output_folder, args.piranha.strip("\""), args.chr_sizes)
+#
+#     print("[NOTE] Running PEAKachu")
+#     call_ctl.peakcalling_peakachu(args.input_signal_bam, args.input_control_bam,
+#                                  args.output_folder, args.peakachu.strip("\""), args.chr_sizes)
+#
+#     peakcomparison.peakcaller_comparison(args.output_folder)
 
-    print("[NOTE] Running Piranha")
-    call_ctl.peakcalling_piranha(args.input_signal_bam, args.input_control_bam,
-                                 args.output_folder, args.piranha.strip("\""))
+#TODO parallel version
+# argument = path to a list of parameter sets, three cols (each col for one peakcaller), if col is empty, use default
+# dict() = list
+# go over each set of paramters
+# bringt barplot with each bar correspinding to the number of np_all
+
+#TODO parallel version of peakcomparsion
+peakcomparison.idr(args.output_folder, 123, 100)
+
+print("[END]")
