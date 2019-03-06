@@ -12,8 +12,10 @@ import numpy
 import scipy.stats as sci
 import time
 import statsmodels.stats.multitest as multi
+import multiprocessing
 
 from matplotlib_venn import venn3_unweighted
+
 
 def ensure_dir(file_path):
     if not os.path.exists(file_path):
@@ -36,17 +38,26 @@ def add_peak_to_dict(peaks, peak_dict):
         i += 1
     file.close()
 
-def generate_count_file(afile, bfile, cfile, label, outputpath):
+def generate_count_file_single(flist, label1, label2, outputpath):
+    options = "-s -c"
+    out = "{}/{}_vs_{}.bed".format(outputpath, label1, label2)
+    sb.Popen("bedtools intersect -a {} -b {} {} > {}".format(flist[0], flist[1], options, out), shell=True).wait()
+
+def generate_count_file(flist, label, outputpath):
     options = "-s -c"
 
     ab_out = "{}/{}_vs_b.bed".format(outputpath, label)
     ac_out = "{}/{}_vs_c.bed".format(outputpath, label)
 
-    ## RUN
-    peak_dict = dict()
+    sb.Popen("bedtools intersect -a {} -b {} {} > {}".format(flist[0], flist[1], options, ab_out), shell=True).wait()
+    sb.Popen("bedtools intersect -a {} -b {} {} > {}".format(flist[0], flist[2], options, ac_out), shell=True).wait()
 
-    sb.Popen("bedtools intersect -a {} -b {} {} > {}".format(afile, bfile, options, ab_out), shell=True).wait()
-    sb.Popen("bedtools intersect -a {} -b {} {} > {}".format(afile, cfile, options, ac_out), shell=True).wait()
+def get_intersect_counts(label, outputpath):
+
+    ab_out = "{}/{}_vs_b.bed".format(outputpath, label)
+    ac_out = "{}/{}_vs_c.bed".format(outputpath, label)
+
+    peak_dict = dict()
 
     # read in files from before
     file_ab = open(ab_out, "r")
@@ -74,7 +85,7 @@ def generate_count_file(afile, bfile, cfile, label, outputpath):
 # Generate pseudo_pool file from random choices of the peaks pool.
 # Choices are with replacement (like int bootstrapping).
 def generate_pseudo_pool(peaks, peak_keys_list, output_file):
-    num_peaks = len(peaks.keys())
+    num_peaks = len(peak_keys_list)
 
     # Do some random choices, where the sample size is as big as the set size.
     random_peaks = [random.choice(peak_keys_list) for x in range(0, int(num_peaks))]
@@ -88,6 +99,7 @@ def generate_pseudo_pool(peaks, peak_keys_list, output_file):
 
     pseudo_pool_file.close()
 
+# Adds counts of different dictionaries together
 def add_pool_counts(pool_dict, sample_dict):
     for key in sample_dict:
         if key not in pool_dict:
@@ -96,8 +108,11 @@ def add_pool_counts(pool_dict, sample_dict):
             pool_dict[key] = pool_dict[key] + sample_dict[key]
 
 # calculate a p-value for robust peaks
-def idr(outputpath, seed, num_pools):
+def idr(outputpath, seed, num_pools, threads):
     random.seed(seed)
+
+    # object needed to share data with processes
+    manager = multiprocessing.Manager()
 
     # INPUT
     peakachu = "{}/peakachu_peaks.bed".format(outputpath)
@@ -111,10 +126,6 @@ def idr(outputpath, seed, num_pools):
     outputpath_tmp = outputpath_idr + "/tmp"
     ensure_dir(outputpath_tmp)
 
-    pseudo_pool_1 = "{}/pool1.bed".format(outputpath_tmp)
-    pseudo_pool_2 = "{}/pool2.bed".format(outputpath_tmp)
-    pseudo_pool_3 = "{}/pool3.bed".format(outputpath_tmp)
-
     all_peaks = "{}/robust_peaks.bed".format(outputpath)
 
     ## Nt = number of peaks consistent between true replicates, we know were the peaks came from, specfic reproducibility
@@ -123,9 +134,13 @@ def idr(outputpath, seed, num_pools):
 
     print("[NOTE] Calculate Nt")
 
-    peakachu_peak_dict = generate_count_file(peakachu, pureclip, piranha, "peakachu", outputpath_idr)
-    piranha_peak_dict = generate_count_file(piranha, peakachu, pureclip, "piranha", outputpath_idr)
-    pureclip_peak_dict = generate_count_file(pureclip, peakachu, piranha, "pureclip", outputpath_idr)
+    generate_count_file([peakachu, pureclip, piranha], "peakachu", outputpath_idr)
+    generate_count_file([piranha, peakachu, pureclip], "piranha", outputpath_idr)
+    generate_count_file([pureclip, peakachu, piranha], "pureclip", outputpath_idr)
+
+    peakachu_peak_dict = get_intersect_counts("peakachu", outputpath_idr)
+    piranha_peak_dict = get_intersect_counts("piranha", outputpath_idr)
+    pureclip_peak_dict = get_intersect_counts("pureclip", outputpath_idr)
 
     Nt_dict = dict()
     Nt_dict.update(peakachu_peak_dict)
@@ -146,13 +161,13 @@ def idr(outputpath, seed, num_pools):
     print("[NOTE] Calculate Np")
 
     # generate a big pool library
-    all_peaks_raw = dict()
+    all_peaks_raw_dict = dict()
 
-    add_peak_to_dict(peakachu, all_peaks_raw)
-    add_peak_to_dict(piranha, all_peaks_raw)
-    add_peak_to_dict(pureclip, all_peaks_raw)
+    add_peak_to_dict(peakachu, all_peaks_raw_dict)
+    add_peak_to_dict(piranha, all_peaks_raw_dict)
+    add_peak_to_dict(pureclip, all_peaks_raw_dict)
 
-    peak_key_list = list(all_peaks_raw.keys())
+    all_peaks_raw_peak_key_list = list(all_peaks_raw_dict.keys())
 
     Np_Nt_dict = dict()
 
@@ -160,17 +175,45 @@ def idr(outputpath, seed, num_pools):
         if key not in Np_Nt_dict:
             Np_Nt_dict[key] = [0] * num_pools
 
-    # to the random pooling n-times
-    for i in range (0, num_pools):
-        print("... generate pools " + str(i + 1))
+    # pools_list = [x for x in range(0, num_pools)]
+    # pool = multiprocessing.Pool(int(threads))
+    # for i in pools_list:
+    #     pool.apply_async(np_nt_quotient_calculation, args=(i, Np_Nt_dict, Nt_dict, all_peaks_raw_dict,
+    #                                                        all_peaks_raw_peak_key_list, outputpath_tmp))
+    # pool.close()
+    # pool.join()
 
-        generate_pseudo_pool(all_peaks_raw, peak_key_list, pseudo_pool_1)
-        generate_pseudo_pool(all_peaks_raw, peak_key_list, pseudo_pool_2)
-        generate_pseudo_pool(all_peaks_raw, peak_key_list, pseudo_pool_3)
+    for i in range(0, num_pools):
 
-        pseudo_pool_1_dict = generate_count_file(pseudo_pool_1, pseudo_pool_2, pseudo_pool_3, "pool1", outputpath_tmp)
-        pseudo_pool_2_dict = generate_count_file(pseudo_pool_2, pseudo_pool_1, pseudo_pool_3, "pool2", outputpath_tmp)
-        pseudo_pool_3_dict = generate_count_file(pseudo_pool_3, pseudo_pool_1, pseudo_pool_2, "pool3", outputpath_tmp)
+        if ( i % 100 == 0 ):
+            print("... generate pools " + str(i))
+
+        pseudo_pool_1 = "{}/pool1.bed".format(outputpath_tmp)
+        pseudo_pool_2 = "{}/pool2.bed".format(outputpath_tmp)
+        pseudo_pool_3 = "{}/pool3.bed".format(outputpath_tmp)
+
+        generate_pseudo_pool(all_peaks_raw_dict, all_peaks_raw_peak_key_list, pseudo_pool_1)
+        generate_pseudo_pool(all_peaks_raw_dict, all_peaks_raw_peak_key_list, pseudo_pool_2)
+        generate_pseudo_pool(all_peaks_raw_dict, all_peaks_raw_peak_key_list, pseudo_pool_3)
+
+        labels = ["pool1", "pool2", "pool3"]
+        tuple_files = [ [[pseudo_pool_1, pseudo_pool_2], [pseudo_pool_1, pseudo_pool_3]],
+                        [[pseudo_pool_2, pseudo_pool_1], [pseudo_pool_2, pseudo_pool_3]],
+                        [[pseudo_pool_3, pseudo_pool_1], [pseudo_pool_3, pseudo_pool_2]]]
+
+        #start = time.time()
+        pool = multiprocessing.Pool(int(threads))
+        for j in range(0, len(labels)):
+            pool.apply_async(generate_count_file_single, args=(tuple_files[j][0], labels[j], "b", outputpath_tmp))
+            pool.apply_async(generate_count_file_single, args=(tuple_files[j][1], labels[j], "c", outputpath_tmp))
+        pool.close()
+        pool.join()
+        #end = time.time()
+        #print(end - start)
+
+        pseudo_pool_1_dict = get_intersect_counts("pool1", outputpath_tmp)
+        pseudo_pool_2_dict = get_intersect_counts("pool2", outputpath_tmp)
+        pseudo_pool_3_dict = get_intersect_counts("pool3", outputpath_tmp)
 
         Np_dict = dict()
         add_pool_counts(Np_dict, pseudo_pool_1_dict)
@@ -178,7 +221,7 @@ def idr(outputpath, seed, num_pools):
         add_pool_counts(Np_dict, pseudo_pool_3_dict)
 
         for key in Np_dict:
-            if ( Nt_dict[key] != 0 ):
+            if (Nt_dict[key] != 0):
                 Np_Nt_dict[key][i] = Np_dict[key] / Nt_dict[key]
             else:
                 Np_Nt_dict[key][i] = 0
@@ -206,9 +249,10 @@ def idr(outputpath, seed, num_pools):
 
     casted_list_means = list(mean_dict.values())
 
+    print("... print plot")
     # Plot the distribution of means.
     f = plt.figure()
-    plt.hist(casted_list_means, bins=50, density=True, alpha=0.6, color='g')
+    plt.hist(casted_list_means, bins=100, density=True, alpha=0.6, color='g')
     xmin, xmax = plt.xlim()
     x = numpy.linspace(xmin, xmax, 100)
     mu_means, std_means = sci.norm.fit(casted_list_means)
@@ -254,8 +298,8 @@ def idr(outputpath, seed, num_pools):
     print("[NOTE] Generate output")
     file_robust_peaks = open(all_peaks, "w")
 
-    for peak in all_peaks_raw:
-        line = all_peaks_raw[peak].strip("\n")
+    for peak in all_peaks_raw_peak_key_list:
+        line = all_peaks_raw_dict[peak].strip("\n")
         id = line.split("\t")[3]
 
         # For every peak that is not listed in the mean list, just do a line with a pval of 1.0.
