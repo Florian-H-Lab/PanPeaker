@@ -92,7 +92,7 @@ def peakcalling_piranha(signal_bam, ctl_bam, outputpath, piranha_par, chr_sizes)
     sb.Popen("cat {0}/*_piranha_peaks_control.bed > {0}/piranha_peaks_control.bed".format(outputpath_piranha), shell=True).wait()
     # third do the intersection
     sb.Popen("bedtools intersect -a {}/piranha_peaks_signal.bed -b ".format(outputpath_piranha) +
-              "{0}/piranha_peaks_control.bed -s -v > {0}/piranha_peaks_raw.bed".format(outputpath_piranha,), shell=True).wait()
+              "{0}/piranha_peaks_control.bed -s -v > {0}/piranha_peaks_raw.bed".format(outputpath_piranha), shell=True).wait()
 
     # extend peak regions by n basepairs
     n = 10
