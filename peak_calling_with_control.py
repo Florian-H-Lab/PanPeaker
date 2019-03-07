@@ -19,7 +19,7 @@ def peakcalling_pureclip(signal_bam, signal_bai, ctl_bam, ctl_bai, genome_fa, ch
         for j in range(0, len(ctl_bam)):
 
             signal_name = signal_bam[i].split("/").pop()
-            ctl_name = ctl_bam[i].split("/").pop()
+            ctl_name = ctl_bam[j].split("/").pop()
 
             crosslinks_file = "{}/{}_vs_{}_crosslinkind_sites.bed".format(outputpath_pureclip, signal_name, ctl_name)
             binding_regions = "{}/{}_vs_{}_binding_regions.bed".format(outputpath_pureclip, signal_name, ctl_name)
