@@ -15,7 +15,9 @@ python PanPeaker.py \
 -c /scratch/bi03/heylf/PanPeaker/test/Input.bam -k /scratch/bi03/heylf/PanPeaker/test/Input.bai -nt 10 \
 -g ../genomes/hg19/GRCh37.p13.genome.fa -o /scratch/bi03/heylf/PanPeaker \
 --chr_sizes ../genomes/hg19/hg19_chr_sizes.txt \
---threads 6
+--threads 6 \
+--para_sets /scratch/bi03/heylf/PanPeaker/parameter_sets.txt \
+--seed 123
 source deactivate panpeaker
 
 
