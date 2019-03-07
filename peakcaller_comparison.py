@@ -311,12 +311,10 @@ def idr(outputpath, seed, num_pools, threads):
             file_robust_peaks.write("{}\t{}\t{}\t{}\n".format(line, "0", "1.0", "1.0"))
     file_robust_peaks.close()
 
-#TODO make parellel version
-#TODO safe parameter list
 def peakcaller_comparison(outputpath):
     print("[NOTE] Run Comparison")
 
-    options="-wa -s -u"
+    options="-s -u"
 
     # INPUT
     peakachu="{}/peakachu_peaks.bed".format(outputpath)
