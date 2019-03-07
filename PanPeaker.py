@@ -156,6 +156,8 @@ if args.output_folder:
     logging.info("outfile: '{}'".format(args.output_folder))
 logging.info("")
 
+##TODO CHECK if bam and bai array have the same length
+
 ###################
 ##   CODE BODY   ##
 ###################
