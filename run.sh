@@ -11,12 +11,12 @@ python PanPeaker.py \
 --piranha "\"-s -p 0.05 -b 50 -i 50 -u 10\"" \
 --pureclip "\"-iv 'chr1;'\"" \
 -i /scratch/bi03/heylf/PanPeaker/test/RBFOX2_rep1.bam /scratch/bi03/heylf/PanPeaker/test/RBFOX2_rep2.bam \
--b /scratch/bi03/heylf/PanPeaker/test/RBFOX2_rep1.bai \
--c /scratch/bi03/heylf/PanPeaker/test/Input.bam -k /scratch/bi03/heylf/PanPeaker/test/Input.bai -nt 10 \
+-b /scratch/bi03/heylf/PanPeaker/test/RBFOX2_rep1.bai /scratch/bi03/heylf/PanPeaker/test/RBFOX2_rep2.bai \
+-c /scratch/bi03/heylf/PanPeaker/test/Input.bam \
+-k /scratch/bi03/heylf/PanPeaker/test/Input.bai \
+-nt 10 \
 -g ../genomes/hg19/GRCh37.p13.genome.fa -o /scratch/bi03/heylf/PanPeaker \
 --chr_sizes ../genomes/hg19/hg19_chr_sizes.txt \
---threads 6 \
---para_sets /scratch/bi03/heylf/PanPeaker/parameter_sets.txt \
 --seed 123
 source deactivate panpeaker
 
