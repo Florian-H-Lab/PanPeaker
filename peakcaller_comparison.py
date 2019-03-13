@@ -27,32 +27,26 @@ def get_line_count(file):
         count += 1
     return count
 
-def add_peak_to_dict(peaks, peak_dict):
+def add_peaks_to_dict(peaks, peak_dict, peaklength_dict):
     file = open(peaks, "r")
-    i = 1
-    if ( len(peak_dict.keys()) != 0 ):
-        i += len(peak_dict.keys())
     for line in file:
-        id = "peak_" + str(i)
-        peak_dict[id] = line
-        i += 1
+        data = line.split("\t")
+        peaklength_dict[data[3]] = abs(int(data[2]) - int(data[1]))
+        peak_dict[data[3]] = line
     file.close()
 
 def generate_count_file_single(flist, label1, label2, outputpath):
     options = "-s -c"
     out = "{}/{}_vs_{}.bed".format(outputpath, label1, label2)
-    sb.Popen("bedtools intersect -a {} -b {} {} > {}".format(flist[0], flist[1], options, out), shell=True).wait()
+    # uniq --> Remove multiple lines (peaks) in each file because of the bootstrapping.
+    # They need to be removed !after! the counting to calculate the quotient correctly.
+    # -k 4 --> column four are the peak ids
+    sb.Popen("bedtools intersect -a {} -b {} {} | sort -k 4 | uniq > {}".format(flist[0], flist[1], options, out),
+             shell=True).wait()
 
-def generate_count_file(flist, label, outputpath):
-    options = "-s -c"
-
-    ab_out = "{}/{}_vs_b.bed".format(outputpath, label)
-    ac_out = "{}/{}_vs_c.bed".format(outputpath, label)
-
-    sb.Popen("bedtools intersect -a {} -b {} {} > {}".format(flist[0], flist[1], options, ab_out), shell=True).wait()
-    sb.Popen("bedtools intersect -a {} -b {} {} > {}".format(flist[0], flist[2], options, ac_out), shell=True).wait()
-
-def get_intersect_counts(label, outputpath):
+# Count hof often a peak occurs in different peaksets of different peakcallers,
+# thus account for robustness of different replciates and different peaks.
+def get_variance_counts_dict(label, outputpath):
 
     ab_out = "{}/{}_vs_b.bed".format(outputpath, label)
     ac_out = "{}/{}_vs_c.bed".format(outputpath, label)
@@ -67,14 +61,12 @@ def get_intersect_counts(label, outputpath):
     for line in file_ab:
         data = line.split("\t")
 
-        # +1 to account for the peak itself
         if data[3] not in peak_dict:
             peak_dict[data[3]] = int(data[6])
 
     for line in file_ac:
         data = line.split("\t")
 
-        # +1 to account for the peak itself
         if data[3] not in peak_dict:
             peak_dict[data[3]] = int(data[6])
         else:
@@ -82,21 +74,74 @@ def get_intersect_counts(label, outputpath):
 
     return(peak_dict)
 
+def generate_intersect_file(flist, label, outputpath):
+    options = "-s -c"
+
+    ab_out = "{}/{}_vs_b.bed".format(outputpath, label)
+    ac_out = "{}/{}_vs_c.bed".format(outputpath, label)
+
+    sb.Popen("bedtools intersect -a {} -b {} {} > {}".format(flist[0], flist[1], options, ab_out), shell=True).wait()
+    sb.Popen("bedtools intersect -a {} -b {} {} > {}".format(flist[0], flist[2], options, ac_out), shell=True).wait()
+
+# Just count the occurence of a peak in different peakcallers
+def get_bias_counts_dict(label, outputpath):
+
+    ab_out = "{}/{}_vs_b.bed".format(outputpath, label)
+    ac_out = "{}/{}_vs_c.bed".format(outputpath, label)
+
+    peak_dict = dict()
+
+    # read in files from before
+    file_ab = open(ab_out, "r")
+    file_ac = open(ac_out, "r")
+
+    # adding counts together
+    for line in file_ab:
+        data = line.split("\t")
+
+        if data[3] not in peak_dict:
+            peak_dict[data[3]] = 1
+
+        if int(data[6]) != 0:
+            peak_dict[data[3]] = peak_dict[data[3]] + 1
+
+    for line in file_ac:
+        data = line.split("\t")
+
+        if data[3] not in peak_dict:
+            peak_dict[data[3]] = 1
+
+        if int(data[6]) != 0:
+            peak_dict[data[3]] = peak_dict[data[3]] + 1
+
+    return(peak_dict)
+
 # Generate pseudo_pool file from random choices of the peaks pool.
-# Choices are with replacement (like int bootstrapping).
-def generate_pseudo_pool(peaks, peak_keys_list, output_file):
-    num_peaks = len(peak_keys_list)
+# Choices are with replacement (like int bootstrapping), to tackle replicates.
+def generate_pseudo_pool(peaks, peak_keys_list, output_file, num_replicates):
+
+    # To tackle peakcaller which can incorporate relicated and thus
+    # have far less peaks in comparison to peakcallers which you have
+    # to apply to replicates individually, take the number of replicates into
+    # account.
+    num_peaks = int(len(peak_keys_list) / num_replicates)
 
     # Do some random choices, where the sample size is as big as the set size.
-    random_peaks = [random.choice(peak_keys_list) for x in range(0, int(num_peaks))]
+    random_peaks = [random.choice(peak_keys_list) for x in range(0, num_peaks)]
 
     # Generate pseudo_pool file.
     pseudo_pool_file = open(output_file, "w")
 
     for key in random_peaks:
-        # write the peak (random choice)
-        pseudo_pool_file.write(peaks[key])
-
+        # a) Write the random chosen peak.
+        # b) To a random shifting of the peaks to tackle also peaks that intersect
+        # to two peak just because is lies inside the borders of two peaks.
+        data = peaks[key].strip("\n").split("\t")
+        shift = random.randint(0,10)
+        start = int(data[1]) + shift
+        end = int(data[2]) + shift
+        pseudo_pool_file.write("{}\t{}\t{}\t{}\t{}\t{}\n".format(data[0], str(start), str(end),
+                                                                data[3], data[4], data[5]))
     pseudo_pool_file.close()
 
 # Adds counts of different dictionaries together
@@ -108,7 +153,7 @@ def add_pool_counts(pool_dict, sample_dict):
             pool_dict[key] = pool_dict[key] + sample_dict[key]
 
 # calculate a p-value for robust peaks
-def idr(outputpath, seed, num_pools, threads):
+def idr(outputpath, seed, num_pools, threads, num_replicates):
     random.seed(seed)
 
     # object needed to share data with processes
@@ -134,18 +179,18 @@ def idr(outputpath, seed, num_pools, threads):
 
     print("[NOTE] Calculate Nt")
 
-    generate_count_file([peakachu, pureclip, piranha], "peakachu", outputpath_idr)
-    generate_count_file([piranha, peakachu, pureclip], "piranha", outputpath_idr)
-    generate_count_file([pureclip, peakachu, piranha], "pureclip", outputpath_idr)
+    generate_intersect_file([peakachu, pureclip, piranha], "peakachu", outputpath_idr)
+    generate_intersect_file([piranha, peakachu, pureclip], "piranha", outputpath_idr)
+    generate_intersect_file([pureclip, peakachu, piranha], "pureclip", outputpath_idr)
 
-    peakachu_peak_dict = get_intersect_counts("peakachu", outputpath_idr)
-    piranha_peak_dict = get_intersect_counts("piranha", outputpath_idr)
-    pureclip_peak_dict = get_intersect_counts("pureclip", outputpath_idr)
+    Nt_pekachu_dict = get_bias_counts_dict("peakachu", outputpath_idr)
+    Nt_piranha_dict = get_bias_counts_dict("piranha", outputpath_idr)
+    Nt_pureclip_dict = get_bias_counts_dict("pureclip", outputpath_idr)
 
     Nt_dict = dict()
-    Nt_dict.update(peakachu_peak_dict)
-    Nt_dict.update(piranha_peak_dict)
-    Nt_dict.update(pureclip_peak_dict)
+    Nt_dict.update(Nt_pekachu_dict)
+    Nt_dict.update(Nt_piranha_dict)
+    Nt_dict.update(Nt_pureclip_dict)
 
     ## Np = number of peaks conistent between pseudoreps, we are oblivious were the peak came from, generel reproducibility
     ## High number of overlaps occur when the same peaks occur quite often and not just because it overlaps just by chance with other peaks
@@ -160,14 +205,20 @@ def idr(outputpath, seed, num_pools, threads):
 
     print("[NOTE] Calculate Np")
 
+    peaklength_dict = dict()
+
     # generate a big pool library
-    all_peaks_raw_dict = dict()
+    peakachu_peaks_dict = dict()
+    add_peaks_to_dict(peakachu, peakachu_peaks_dict, peaklength_dict)
+    peakachu_peak_key_list = list(peakachu_peaks_dict.keys())
 
-    add_peak_to_dict(peakachu, all_peaks_raw_dict)
-    add_peak_to_dict(piranha, all_peaks_raw_dict)
-    add_peak_to_dict(pureclip, all_peaks_raw_dict)
+    piranha_peaks_dict = dict()
+    add_peaks_to_dict(piranha, piranha_peaks_dict, peaklength_dict)
+    piranha_peak_key_list = list(piranha_peaks_dict.keys())
 
-    all_peaks_raw_peak_key_list = list(all_peaks_raw_dict.keys())
+    pureclip_peaks_dict = dict()
+    add_peaks_to_dict(pureclip, pureclip_peaks_dict, peaklength_dict)
+    pureclip_peak_key_list = list(pureclip_peaks_dict.keys())
 
     Np_Nt_dict = dict()
 
@@ -175,28 +226,21 @@ def idr(outputpath, seed, num_pools, threads):
         if key not in Np_Nt_dict:
             Np_Nt_dict[key] = [0] * num_pools
 
-    # pools_list = [x for x in range(0, num_pools)]
-    # pool = multiprocessing.Pool(int(threads))
-    # for i in pools_list:
-    #     pool.apply_async(np_nt_quotient_calculation, args=(i, Np_Nt_dict, Nt_dict, all_peaks_raw_dict,
-    #                                                        all_peaks_raw_peak_key_list, outputpath_tmp))
-    # pool.close()
-    # pool.join()
-
     for i in range(0, num_pools):
 
         if ( i % 100 == 0 ):
             print("... generate pools " + str(i))
 
-        pseudo_pool_1 = "{}/pool1.bed".format(outputpath_tmp)
-        pseudo_pool_2 = "{}/pool2.bed".format(outputpath_tmp)
-        pseudo_pool_3 = "{}/pool3.bed".format(outputpath_tmp)
+        pseudo_pool_1 = "{}/pool_peakachu.bed".format(outputpath_tmp)
+        pseudo_pool_2 = "{}/pool_piranha.bed".format(outputpath_tmp)
+        pseudo_pool_3 = "{}/pool_pureclip.bed".format(outputpath_tmp)
 
-        generate_pseudo_pool(all_peaks_raw_dict, all_peaks_raw_peak_key_list, pseudo_pool_1)
-        generate_pseudo_pool(all_peaks_raw_dict, all_peaks_raw_peak_key_list, pseudo_pool_2)
-        generate_pseudo_pool(all_peaks_raw_dict, all_peaks_raw_peak_key_list, pseudo_pool_3)
+        # Because peakachu can incoorporate replicate, num_replicates = 1
+        generate_pseudo_pool(peakachu_peaks_dict, peakachu_peak_key_list, pseudo_pool_1, 1)
+        generate_pseudo_pool(piranha_peaks_dict, piranha_peak_key_list, pseudo_pool_2, num_replicates)
+        generate_pseudo_pool(pureclip_peaks_dict, pureclip_peak_key_list, pseudo_pool_3, num_replicates)
 
-        labels = ["pool1", "pool2", "pool3"]
+        labels = ["pool_peakachu", "pool_piranha", "pool_pureclip"]
         tuple_files = [ [[pseudo_pool_1, pseudo_pool_2], [pseudo_pool_1, pseudo_pool_3]],
                         [[pseudo_pool_2, pseudo_pool_1], [pseudo_pool_2, pseudo_pool_3]],
                         [[pseudo_pool_3, pseudo_pool_1], [pseudo_pool_3, pseudo_pool_2]]]
@@ -211,26 +255,28 @@ def idr(outputpath, seed, num_pools, threads):
         #end = time.time()
         #print(end - start)
 
-        pseudo_pool_1_dict = get_intersect_counts("pool1", outputpath_tmp)
-        pseudo_pool_2_dict = get_intersect_counts("pool2", outputpath_tmp)
-        pseudo_pool_3_dict = get_intersect_counts("pool3", outputpath_tmp)
+        pseudo_pool_1_dict = get_variance_counts_dict("pool_peakachu", outputpath_tmp)
+        pseudo_pool_2_dict = get_variance_counts_dict("pool_piranha", outputpath_tmp)
+        pseudo_pool_3_dict = get_variance_counts_dict("pool_pureclip", outputpath_tmp)
 
         Np_dict = dict()
         add_pool_counts(Np_dict, pseudo_pool_1_dict)
         add_pool_counts(Np_dict, pseudo_pool_2_dict)
         add_pool_counts(Np_dict, pseudo_pool_3_dict)
 
+        # Take the length of the peak into account. Broad peaks intersectin with lots of
+        # other peaks from different peakcallers are not good.
         for key in Np_dict:
-            if (Nt_dict[key] != 0):
-                Np_Nt_dict[key][i] = Np_dict[key] / Nt_dict[key]
-            else:
-                Np_Nt_dict[key][i] = 0
+            Np_Nt_dict[key][i] = (Np_dict[key] * Nt_dict[key]) / peaklength_dict[key]
 
-    # Only peak with Nt_dict[key] != 0 are true robust peaks.
-    # The feature Nt_dict[key] = 0 corresponds to peaks which only appear for the individual peakcaller.
+    # First constraint: Only peak with Nt_dict[key] != 1 are true robust peaks.
+    # The feature Nt_dict[key] = 1 corresponds to peaks which only appear for the individual peakcaller.
+    # Second constraint: Takes peaks out that are shared between peakcallers, but does not intersect with
+    # other peaks if you do the bootstrapping, so the peak is not good supported by other peaks (replicates,
+    # number of peaks) of the other peakcallers.
     true_peaks = list()
     for key in Nt_dict:
-        if( Nt_dict[key] != 0 ):
+        if( Nt_dict[key] != 1 and not all(v == 0 for v in Np_Nt_dict[key]) ):
             true_peaks.append(key)
 
     ## Np/Nt < p-val
@@ -261,6 +307,11 @@ def idr(outputpath, seed, num_pools, threads):
     title = "Fit results: mu = %.2f,  std = %.2f" % (mu_means, std_means)
     plt.title(title)
     f.savefig(outputpath_idr + "/expected_mean_pdf_of_Np_Nt_quotient.pdf", bbox_inches='tight')
+
+    # x = numpy.linspace(xmin, xmax, 1000)
+    # mean_ttest = 2.
+    # sd_ttest = 1.
+    # p = sci.norm.pdf(x, mean_ttest, sd_ttest)
 
     print("... perform one sided ttest")
     for key in true_peaks:
@@ -298,7 +349,13 @@ def idr(outputpath, seed, num_pools, threads):
     print("[NOTE] Generate output")
     file_robust_peaks = open(all_peaks, "w")
 
-    for peak in all_peaks_raw_peak_key_list:
+    # whole entire set of peaks
+    all_peaks_raw_dict = dict()
+    all_peaks_raw_dict.update(peakachu_peaks_dict)
+    all_peaks_raw_dict.update(piranha_peaks_dict)
+    all_peaks_raw_dict.update(pureclip_peaks_dict)
+
+    for peak in all_peaks_raw_dict:
         line = all_peaks_raw_dict[peak].strip("\n")
         id = line.split("\t")[3]
 
