@@ -95,7 +95,7 @@ def peakcalling_piranha(signal_bam, ctl_bam, outputpath, piranha_par, chr_sizes)
               "{0}/piranha_peaks_control.bed -s -v > {0}/piranha_peaks_raw.bed".format(outputpath_piranha), shell=True).wait()
 
     # extend peak regions by n basepairs
-    n = 10
+    n = 1
     sb.Popen("bedtools slop -header -b {0} -i {1}/piranha_peaks_raw.bed -g {2} > {1}/piranha_peaks_extended.bed".format(
              n, outputpath_piranha, chr_sizes), shell=True).wait()
 
@@ -138,7 +138,7 @@ def peakcalling_peakachu(signal_bam, ctl_bam, outputpath, peakachu_par, chr_size
     sb.Popen("cat {0}/peak_annotations/*.gff | grep peak > {0}/peakachu_peaks.gff".format(outputpath_peakachu), shell=True).wait()
 
     # extend peak regions by n basepairs
-    n = 10
+    n = 1
     sb.Popen("bedtools slop -header -b {} -i {}/peakachu_peaks.gff -g {} > {}/peakachu_peaks_extended.gff".format(
              n, outputpath_peakachu, chr_sizes, outputpath_peakachu), shell=True).wait()
 
