@@ -235,7 +235,7 @@ if ( args.para_sets ):
                                          args.output_folder, para_dict["Piranha"][i], args.chr_sizes)
 
             print("[NOTE] Running PEAKachu")
-            call_ctl.peakcalling_peakachu(args.input_signal_bam, args.input_control_bam,
+            call_ctl.peakcalling_peakachu(signal_bam_files_peakachu, control_bam_files_peakachu,
                                          args.output_folder, para_dict["PEAKachu"][i], args.chr_sizes)
         else:
             print("[NOTE] Running PureCLIP")
@@ -243,10 +243,12 @@ if ( args.para_sets ):
                                       args.chr_sizes, args.output_folder, para_dict["PureCLIP"][i], args.threads)
 
             print("[NOTE] Running Piranha")
-            call.peakcalling_piranha(args.input_signal_bam, args.output_folder, para_dict["Piranha"][i], args.chr_sizes)
+            call.peakcalling_piranha(args.input_signal_bam, args.output_folder,
+                                     para_dict["Piranha"][i], args.chr_sizes)
 
             print("[NOTE] Running PEAKachu")
-            call.peakcalling_peakachu(args.input_signal_bam, args.output_folder, para_dict["PEAKachu"][i], args.chr_sizes)
+            call.peakcalling_peakachu(signal_bam_files_peakachu, control_bam_files_peakachu,
+                                      para_dict["PEAKachu"][i], args.chr_sizes)
 
         num_robust_peaks_list[i] = peakcomparison.peakcaller_comparison(args.output_folder)
 
@@ -278,29 +280,32 @@ if ( args.para_sets ):
     final_parameterset_dict["PureCLIP"] = para_dict["PureCLIP"][best_set_index]
 
 print("[NOTE] Execute peak calling with best or chosen parameter set.")
-# if( bool_control == 0 ):
-#     print("[NOTE] Running PureCLIP")
-#     call_ctl.peakcalling_pureclip(args.input_signal_bam, args.input_signal_bai, args.input_control_bam,
-#                                   args.input_control_bai, args.genome_file, args.chr_sizes, args.output_folder,
-#                                   final_parameterset_dict["PureCLIP"], args.threads)
-#
-#     print("[NOTE] Running Piranha")
-#     call_ctl.peakcalling_piranha(args.input_signal_bam, args.input_control_bam,
-#                                  args.output_folder, final_parameterset_dict["Piranha"], args.chr_sizes)
-#
-#     print("[NOTE] Running PEAKachu")
-#     call_ctl.peakcalling_peakachu(args.input_signal_bam, args.input_control_bam,
-#                                  args.output_folder, final_parameterset_dict["PEAKachu"], args.chr_sizes)
-# else:
-#     print("[NOTE] Running PureCLIP")
-#     call.peakcalling_pureclip(args.input_signal_bam, args.input_signal_bai, args.genome_file,
-#                               args.chr_sizes, args.output_folder, final_parameterset_dict["PureCLIP"], args.threads)
-#
-#     print("[NOTE] Running Piranha")
-#     call.peakcalling_piranha(args.input_signal_bam, args.output_folder, final_parameterset_dict["Piranha"], args.chr_sizes)
-#
-#     print("[NOTE] Running PEAKachu")
-#     call.peakcalling_peakachu(args.input_signal_bam, args.output_folder, final_parameterset_dict["PEAKachu"], args.chr_sizes)
+if( bool_control == 0 ):
+    print("[NOTE] Running PureCLIP")
+    call_ctl.peakcalling_pureclip(args.input_signal_bam, args.input_signal_bai, args.input_control_bam,
+                                  args.input_control_bai, args.genome_file, args.chr_sizes, args.output_folder,
+                                  final_parameterset_dict["PureCLIP"], args.threads)
+
+    print("[NOTE] Running Piranha")
+    call_ctl.peakcalling_piranha(args.input_signal_bam, args.input_control_bam,
+                                 args.output_folder, final_parameterset_dict["Piranha"], args.chr_sizes)
+
+    print("[NOTE] Running PEAKachu")
+    call_ctl.peakcalling_peakachu(signal_bam_files_peakachu, control_bam_files_peakachu,
+                                 args.output_folder, final_parameterset_dict["PEAKachu"], args.chr_sizes)
+else:
+    print("[NOTE] Running PureCLIP")
+    call.peakcalling_pureclip(args.input_signal_bam, args.input_signal_bai, args.genome_file,
+                              args.chr_sizes, args.output_folder, final_parameterset_dict["PureCLIP"],
+                              args.threads)
+
+    print("[NOTE] Running Piranha")
+    call.peakcalling_piranha(args.input_signal_bam, args.output_folder,
+                             final_parameterset_dict["Piranha"], args.chr_sizes)
+
+    print("[NOTE] Running PEAKachu")
+    call.peakcalling_peakachu(signal_bam_files_peakachu, control_bam_files_peakachu,
+                              final_parameterset_dict["PEAKachu"], args.chr_sizes)
 
 
 print("[NOTE] Peakcaller Comparison")
