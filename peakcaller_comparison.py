@@ -118,13 +118,9 @@ def get_bias_counts_dict(label, outputpath):
 
 # Generate pseudo_pool file from random choices of the peaks pool.
 # Choices are with replacement (like int bootstrapping), to tackle replicates.
-def generate_pseudo_pool(peaks, peak_keys_list, output_file, num_replicates):
+def generate_pseudo_pool(peaks, peak_keys_list, output_file):
 
-    # To tackle peakcaller which can incorporate relicated and thus
-    # have far less peaks in comparison to peakcallers which you have
-    # to apply to replicates individually, take the number of replicates into
-    # account.
-    num_peaks = int(len(peak_keys_list) / num_replicates)
+    num_peaks = len(peak_keys_list)
 
     # Do some random choices, where the sample size is as big as the set size.
     random_peaks = [random.choice(peak_keys_list) for x in range(0, num_peaks)]
@@ -235,10 +231,9 @@ def idr(outputpath, seed, num_pools, threads, num_replicates):
         pseudo_pool_2 = "{}/pool_piranha.bed".format(outputpath_tmp)
         pseudo_pool_3 = "{}/pool_pureclip.bed".format(outputpath_tmp)
 
-        # Because peakachu can incoorporate replicate, num_replicates = 1
-        generate_pseudo_pool(peakachu_peaks_dict, peakachu_peak_key_list, pseudo_pool_1, 1)
-        generate_pseudo_pool(piranha_peaks_dict, piranha_peak_key_list, pseudo_pool_2, num_replicates)
-        generate_pseudo_pool(pureclip_peaks_dict, pureclip_peak_key_list, pseudo_pool_3, num_replicates)
+        generate_pseudo_pool(peakachu_peaks_dict, peakachu_peak_key_list, pseudo_pool_1)
+        generate_pseudo_pool(piranha_peaks_dict, piranha_peak_key_list, pseudo_pool_2)
+        generate_pseudo_pool(pureclip_peaks_dict, pureclip_peak_key_list, pseudo_pool_3)
 
         labels = ["pool_peakachu", "pool_piranha", "pool_pureclip"]
         tuple_files = [ [[pseudo_pool_1, pseudo_pool_2], [pseudo_pool_1, pseudo_pool_3]],
@@ -267,7 +262,7 @@ def idr(outputpath, seed, num_pools, threads, num_replicates):
         # Take the length of the peak into account. Broad peaks intersectin with lots of
         # other peaks from different peakcallers are not good.
         for key in Np_dict:
-            Np_Nt_dict[key][i] = (Np_dict[key] * Nt_dict[key]) / peaklength_dict[key]
+            Np_Nt_dict[key][i] = (Np_dict[key] * Nt_dict[key] * 1000000) / peaklength_dict[key]
 
     # First constraint: Only peak with Nt_dict[key] != 1 are true robust peaks.
     # The feature Nt_dict[key] = 1 corresponds to peaks which only appear for the individual peakcaller.
@@ -275,68 +270,89 @@ def idr(outputpath, seed, num_pools, threads, num_replicates):
     # other peaks if you do the bootstrapping, so the peak is not good supported by other peaks (replicates,
     # number of peaks) of the other peakcallers.
     true_peaks = list()
-    for key in Nt_dict:
+    for key in Np_Nt_dict:
         if( Nt_dict[key] != 1 and not all(v == 0 for v in Np_Nt_dict[key]) ):
             true_peaks.append(key)
+
+    # Create a distribution for Nt_dict[key] == 1 which is my negative model
+    false_peaks = list()
+    for key in Nt_dict:
+        if( Nt_dict[key] == 1 and not all(v == 0 for v in Np_Nt_dict[key]) ):
+            false_peaks.append(key)
 
     ## Np/Nt < p-val
     ## A robust peak should have a high quotient
     print("[NOTE] Calculate p-value")
 
     # generate p-value dict and distribution of the means
-    pval_dict = dict()
     mean_dict = dict()
-    std_dict = dict()
 
     for key in true_peaks:
-        mu, std = sci.norm.fit(Np_Nt_dict[key])
-        mean_dict[key] = mu
-        std_dict[key] = std
+        mean_dict[key] = numpy.mean(Np_Nt_dict[key])
 
     casted_list_means = list(mean_dict.values())
+    log_casted_list_means = numpy.log1p(casted_list_means)
 
     print("... print plot")
     # Plot the distribution of means.
     f = plt.figure()
-    plt.hist(casted_list_means, bins=100, density=True, alpha=0.6, color='g')
+    plt.hist(log_casted_list_means, bins=100, density=True, alpha=0.6, color='g')
     xmin, xmax = plt.xlim()
     x = numpy.linspace(xmin, xmax, 100)
-    mu_means, std_means = sci.norm.fit(casted_list_means)
+    mu_means, std_means = sci.norm.fit(log_casted_list_means)
     p = sci.norm.pdf(x, mu_means, std_means)
     plt.plot(x, p, 'k', linewidth=2)
     title = "Fit results: mu = %.2f,  std = %.2f" % (mu_means, std_means)
     plt.title(title)
     f.savefig(outputpath_idr + "/expected_mean_pdf_of_Np_Nt_quotient.pdf", bbox_inches='tight')
 
-    # x = numpy.linspace(xmin, xmax, 1000)
-    # mean_ttest = 2.
-    # sd_ttest = 1.
-    # p = sci.norm.pdf(x, mean_ttest, sd_ttest)
+    mean_false_dict = dict()
+
+    for key in false_peaks:
+        mean_false_dict[key] = numpy.mean(Np_Nt_dict[key])
+
+    casted_list_means_false = list(mean_false_dict.values())
+    log_casted_list_means_false = numpy.log1p(casted_list_means_false)
+
+    # Plot the distribution of means of the false sample set.
+    f_false = plt.figure()
+    plt.hist(log_casted_list_means_false, bins=100, density=True, alpha=0.6, color='g')
+    xmin, xmax = plt.xlim()
+    x_false = numpy.linspace(xmin, xmax, 100)
+    mu_means_false, std_means_false = sci.norm.fit(log_casted_list_means_false)
+    p_false = sci.norm.pdf(x_false, mu_means_false, std_means_false)
+    plt.plot(x_false, p_false, 'k', linewidth=2)
+    title_false = "Fit results: mu = %.2f,  std = %.2f" % (mu_means_false, std_means_false)
+    plt.title(title_false)
+    f_false.savefig(outputpath_idr + "/expected_mean_false_pdf_of_Np_Nt_quotient.pdf", bbox_inches='tight')
 
     print("... perform one sided ttest")
+    #all_pvals_dict = dict()
+    true_pvals_dict = dict()
     for key in true_peaks:
         # p/2 --> to get one-sided ttest
         # I just want the significance that my quotient is bigger than the expected quotient. This
         # represents a higher and more robust peaks.
-        if ( mean_dict[key] >= mu_means ):
-            pval_dict[key] = (sci.ttest_ind(Np_Nt_dict[key], casted_list_means)[1])/2
-        else:
-            pval_dict[key] = 1.0
+        if ( mean_dict[key] >= mu_means_false ):
+        #    all_pvals_dict[key] = (sci.ttest_ind(Np_Nt_dict[key], casted_list_means_false)[1])/2
+            true_pvals_dict[key] = (sci.ttest_ind(numpy.log1p(Np_Nt_dict[key]), log_casted_list_means_false)[1])/2
+        #else:
+        #    all_pvals_dict[key] = 1.0
 
     # Plot distribution of p-vals
     print("... plot pval distribution")
     f = plt.figure()
-    plt.hist(pval_dict.values(), bins=50, density=True, alpha=0.6, color='g')
+    plt.hist(list(true_pvals_dict.values()), bins=50, density=True, alpha=0.6, color='g')
     f.savefig(outputpath_idr + "/pval_distribution.pdf", bbox_inches='tight')
 
     # Benjamin hochberg correctur for multiple hypothesis testing
     print("... perform BH correction")
-    pvals_corrected = multi.multipletests(list(pval_dict.values()), alpha=0.05, method='fdr_bh',
+    pvals_corrected = multi.multipletests(list(true_pvals_dict.values()), alpha=0.05, method='fdr_bh',
                                           is_sorted=False, returnsorted=False)
 
     i = 0
     pvals_corrected_dict = dict()
-    for key in pval_dict:
+    for key in true_pvals_dict:
         pvals_corrected_dict[key] = pvals_corrected[1][i]
         i += 1
 
@@ -362,8 +378,8 @@ def idr(outputpath, seed, num_pools, threads, num_replicates):
         # For every peak that is not listed in the mean list, just do a line with a pval of 1.0.
         # These lines are the peaks that are not considered for the expected mean distribution and
         # p-value correction. These peaks do not overlap with any other peak from the other peakcallers.
-        if ( id in mean_dict ):
-            file_robust_peaks.write("{}\t{}\t{}\t{}\n".format(line, mean_dict[id], pval_dict[id], pvals_corrected_dict[id]))
+        if ( id in true_pvals_dict ):
+            file_robust_peaks.write("{}\t{}\t{}\t{}\n".format(line, mean_dict[id], true_pvals_dict[id], pvals_corrected_dict[id]))
         else:
             file_robust_peaks.write("{}\t{}\t{}\t{}\n".format(line, "0", "1.0", "1.0"))
     file_robust_peaks.close()
