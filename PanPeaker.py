@@ -279,6 +279,12 @@ if ( args.para_sets ):
     final_parameterset_dict["Piranha"] = para_dict["Piranha"][best_set_index]
     final_parameterset_dict["PureCLIP"] = para_dict["PureCLIP"][best_set_index]
 
+    log_parameter_finding_file = open(args.output_folder + "/log_parameter_finding_file.txt", "a")
+    log_parameter_finding_file.write("Using Set:\t{}\t{}\t{}\n".format(para_dict["PEAKachu"][best_set_index],
+                                                                 para_dict["Piranha"][best_set_index],
+                                                                 para_dict["PureCLIP"][best_set_index]))
+    log_parameter_finding_file.close()
+
 print("[NOTE] Execute peak calling with best or chosen parameter set.")
 if( bool_control == 0 ):
     print("[NOTE] Running PureCLIP")
@@ -309,7 +315,7 @@ else:
 
 
 print("[NOTE] Peakcaller Comparison")
-# peakcomparison.peakcaller_comparison(args.output_folder)
+peakcomparison.peakcaller_comparison(args.output_folder)
 
 print("[NOTE] IDR")
 peakcomparison.idr(args.output_folder, args.seed, 1000, args.threads, len(args.input_signal_bam))
