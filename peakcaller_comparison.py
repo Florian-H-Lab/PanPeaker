@@ -14,7 +14,7 @@ import time
 import statsmodels.stats.multitest as multi
 import multiprocessing
 
-from matplotlib_venn import venn3_unweighted
+from simple_venn import venn3
 
 
 def ensure_dir(file_path):
@@ -22,10 +22,13 @@ def ensure_dir(file_path):
         os.mkdir(file_path)
 
 def get_line_count(file):
+    f = open(file, "r")
     count = 0
-    for line in file:
+    for line in f:
         count += 1
+    f.close()
     return count
+
 
 def add_peaks_to_dict(peaks, peak_dict, peaklength_dict):
     file = open(peaks, "r")
@@ -390,9 +393,9 @@ def peakcaller_comparison(outputpath):
     options="-s -u"
 
     # INPUT
-    peakachu="{}/peakachu_peaks.bed".format(outputpath)
-    pureclip="{}/pureclip_peaks.bed".format(outputpath)
-    piranha="{}/piranha_peaks.bed".format(outputpath)
+    n_a = "{}/peakachu_peaks.bed".format(outputpath)
+    n_b = "{}/piranha_peaks.bed".format(outputpath)
+    n_c = "{}/pureclip_peaks.bed".format(outputpath)
 
     ## OUTPUT
     # for parallelisation
@@ -400,62 +403,94 @@ def peakcaller_comparison(outputpath):
     outputpath_comparison = outputpath + "/peak_comparison"
     ensure_dir(outputpath_comparison)
 
-    peakachu_pureclip = "{}/peakachu_pureclip_peaks.bed".format(outputpath_comparison)
-    peakachu_piranha = "{}/peakachu_piranha_peaks.bed".format(outputpath_comparison)
-    piranha_pureclip = "{}/piranha_pureclip_peaks.bed".format(outputpath_comparison)
-    all = "{}/peakachu_piranha_pureclip_peaks.bed".format(outputpath_comparison)
+    n_ab = "{}/peakachu_piranha_peaks.bed".format(outputpath_comparison)
+    n_ac = "{}/peakachu_pureclip_peaks.bed".format(outputpath_comparison)
+
+    n_ba = "{}/piranha_peakachu_peaks.bed".format(outputpath_comparison)
+    n_bc = "{}/piranha_pureclip_peaks.bed".format(outputpath_comparison)
+
+    n_ca = "{}/pureclip_peakachu_peaks.bed".format(outputpath_comparison)
+    n_cb = "{}/pureclip_piranha_peaks.bed".format(outputpath_comparison)
+
+    n_abc = "{}/peakachu_piranha_pureclip_peaks.bed".format(outputpath_comparison)
+    n_bac = "{}/piranha_peakachu_pureclip_peaks.bed".format(outputpath_comparison)
+    n_cab = "{}/pureclip_peakachu_piranha_peaks.bed".format(outputpath_comparison)
 
     ## RUN
-    sb.Popen("bedtools intersect -a {} -b {} {} > {}".format(peakachu, pureclip, options, peakachu_pureclip), shell=True).wait()
-    sb.Popen("bedtools intersect -a {} -b {} {} > {}".format(peakachu, piranha, options, peakachu_piranha), shell=True).wait()
-    sb.Popen("bedtools intersect -a {} -b {} {} > {}".format(piranha, pureclip, options, piranha_pureclip), shell=True).wait()
-    sb.Popen("bedtools intersect -a {} -b {} {} > {}".format(peakachu_piranha, pureclip, options, all), shell=True).wait()
+    sb.Popen("bedtools intersect -a {} -b {} {} > {}".format(n_a, n_b, options, n_ab), shell=True).wait()
+    sb.Popen("bedtools intersect -a {} -b {} {} > {}".format(n_a, n_c, options, n_ac), shell=True).wait()
+    sb.Popen("bedtools intersect -a {} -b {} {} > {}".format(n_b, n_a, options, n_ba), shell=True).wait()
+    sb.Popen("bedtools intersect -a {} -b {} {} > {}".format(n_b, n_c, options, n_bc), shell=True).wait()
+    sb.Popen("bedtools intersect -a {} -b {} {} > {}".format(n_c, n_a, options, n_ca), shell=True).wait()
+    sb.Popen("bedtools intersect -a {} -b {} {} > {}".format(n_c, n_b, options, n_cb), shell=True).wait()
+    sb.Popen("bedtools intersect -a {} -b {} {} > {}".format(n_ab, n_c, options, n_abc), shell=True).wait()
+    sb.Popen("bedtools intersect -a {} -b {} {} > {}".format(n_ba, n_c, options, n_bac), shell=True).wait()
+    sb.Popen("bedtools intersect -a {} -b {} {} > {}".format(n_ca, n_b, options, n_cab), shell=True).wait()
 
     ## STATS
-    f_peakachu = open(peakachu, "r")
-    f_piranha = open(piranha, "r")
-    f_pureclip = open(pureclip, "r")
-    f_peakachu_pureclip = open(peakachu_pureclip, "r")
-    f_piranha_pureclip = open(piranha_pureclip, "r")
-    f_peakachu_piranha = open(peakachu_pureclip, "r")
-    f_all = open(all, "r")
+    abc = get_line_count(n_abc)
+    bac = get_line_count(n_bac)
+    cab = get_line_count(n_cab)
 
-    np_peakachu = get_line_count(f_peakachu)
-    np_piranha = get_line_count(f_piranha)
-    np_pureclip = get_line_count(f_pureclip)
-    np_peakachu_pureclip = get_line_count(f_peakachu_pureclip)
-    np_piranha_pureclip = get_line_count(f_piranha_pureclip)
-    np_peakachu_piranha = get_line_count(f_peakachu_piranha)
-    np_all = get_line_count(f_all)
+    ac = get_line_count(n_ac)
+    ab = get_line_count(n_ab)
+    ba = get_line_count(n_ba)
+    bc = get_line_count(n_bc)
+    ca = get_line_count(n_ca)
+    cb = get_line_count(n_cb)
 
-    f_peakachu.close()
-    f_piranha.close()
-    f_pureclip.close()
-    f_peakachu_pureclip.close()
-    f_piranha_pureclip.close()
-    f_peakachu_piranha.close()
-    f_all.close()
+    a = get_line_count(n_a)
+    b = get_line_count(n_b)
+    c = get_line_count(n_c)
 
     stats_file = open("{}/stats_comparison.txt".format(outputpath_comparison), "w")
     stats_file.write("peakcaller\tpeakcount\n")
-    stats_file.write("PEAKachu\t{}\n".format(np_peakachu))
-    stats_file.write("Piranha\t{}\n".format(np_piranha))
-    stats_file.write("PureCLIP\t{}\n".format(np_pureclip))
-    stats_file.write("PEAKachu_PureCLIP\t{}\n".format(np_peakachu_pureclip))
-    stats_file.write("Piranha_PureCLIP\t{}\n".format(np_piranha_pureclip))
-    stats_file.write("PEAKachu_Piranha\t{}\n".format(np_peakachu_piranha))
-    stats_file.write("ALL\t{}\n".format(np_all))
+    stats_file.write("PEAKachu\t{}\n".format(a))
+    stats_file.write("Piranha\t{}\n".format(b))
+    stats_file.write("PureCLIP\t{}\n".format(c))
+    stats_file.write("PEAKachu_Piranha\t{}\n".format(ab))
+    stats_file.write("PEAKachu_PureCLIP\t{}\n".format(ac))
+    stats_file.write("Piranha_PEAKachu\t{}\n".format(ba))
+    stats_file.write("Piranha_PureCLIP\t{}\n".format(bc))
+    stats_file.write("PureCLIP_PEAKachu\t{}\n".format(ca))
+    stats_file.write("PureCLIP_PEAKachu\t{}\n".format(cb))
+    stats_file.write("ALL_PEAKachu\t{}\n".format(abc))
+    stats_file.write("ALL_Piranha\t{}\n".format(bac))
+    stats_file.write("ALL_PureCLIP\t{}\n".format(cab))
     stats_file.close()
 
+    # Adjust values for venn diagram
+    ab -= abc
+    ac -= abc
+
+    ba -= bac
+    bc -= bac
+
+    ca -= cab
+    cb -= cab
+
+    a -= (abc + ab + ac)
+    b -= (bac + ba + bc)
+    c -= (cab + ca + cb)
+
+    np_all = abc + bac + cab
+
+    #data = [np_peakachu, np_piranha, np_peakachu_piranha, np_pureclip, np_peakachu_pureclip, np_piranha_pureclip, np_all]
+    a = "A:" + str(a)
+    b = "B:" + str(b)
+    c = "C:" + str(c)
+    ab = "A:" + str(ab) + "\nB:" + str(ba)
+    ac = "A:" + str(ac) + "\nC:" + str(ca)
+    bc = "B:" + str(bc) + "\nC" + str(cb)
+    abc = "A:" + str(abc) + "\nB:" + str(bac) + "\nC:" + str(cab)
+
+    data = [a, b, c, ab, ac, bc, abc]
+
     ## VENN DIAGRAM
-    #(A, B, AB, C, AC, BC, ABC)
-    f = plt.figure()
-    venn3_unweighted(subsets=(np_peakachu, np_piranha, np_peakachu_piranha,
-                              np_pureclip, np_peakachu_pureclip, np_piranha_pureclip, np_all),
-                     set_labels=('PEAKachu', 'Piranha', 'PureCLIP'),
-                     set_colors=('r', 'y', 'b'))
+    #[A, B, C, AB, AC, BC, ABC]
+    f = plt.figure(figsize=(8, 8))
+    plt.rcParams["font.family"] = "serif"
+    venn3(subsets=data, set_labels=('PEAKachu', 'Piranha', 'PureCLIP'), set_colors=('r', 'y', 'b'))
     plt.show()
-    f.savefig(outputpath_comparison + "/comparison_plot.pdf", bbox_inches='tight')
+    f.savefig(outputpath_comparison + "/comparison_plot.pdf", bbox_inches='tight', dpi=300)
     return(np_all)
-
-
