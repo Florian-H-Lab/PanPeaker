@@ -26,7 +26,7 @@ def refinement(outputpath, adj_pval):
     refined_file = outputpath + "/robust_peaks_refined.bed"
 
     sb.Popen("bedtools sort -i {} > {}".format(input_file, sort_file), shell=True).wait()
-    sb.Popen("awk '$9<" + str(adj_pval) + "{print $0}' " + sort_file + " > " + filtered_file, shell=True).wait()
+    sb.Popen("awk '$9<=" + str(adj_pval) + "{print $0}' " + sort_file + " > " + filtered_file, shell=True).wait()
     sb.Popen("bedtools merge -i {} -s -c 6,9 -o distinct,mean > {}".format(filtered_file, refined_file_tmp), shell=True).wait()
     sb.Popen("awk -v OFS='\t' '{print $1,$2,$3,\"peak_\"NR,$5,$4}' " + refined_file_tmp + " > " + refined_file, shell=True).wait()
 
