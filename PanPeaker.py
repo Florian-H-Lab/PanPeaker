@@ -107,7 +107,7 @@ parser.add_argument(
 parser.add_argument(
     "--pureclip",
     metavar='...',
-    default="",
+    default="-bc 0",
     help="Parameter list for PureCLIP")
 parser.add_argument(
     "-nt", "--threads",
@@ -237,8 +237,8 @@ if ( args.para_sets ):
         if( bool_control == 0 ):
             print("[NOTE] Running PureCLIP")
             call_ctl.peakcalling_pureclip(args.input_signal_bam, args.input_signal_bai, args.input_control_bam,
-                                          args.input_control_bai, args.genome_file, args.chr_sizes, args.output_folder,
-                                          para_dict["PureCLIP"][i], args.threads)
+                                          args.input_control_bai, args.genome_file, args.chr_sizes, args.output_folder, args.threads,
+                                          para_dict["PureCLIP"][i])
 
             print("[NOTE] Running Piranha")
             call_ctl.peakcalling_piranha(args.input_signal_bam, args.input_control_bam,
@@ -250,7 +250,7 @@ if ( args.para_sets ):
         else:
             print("[NOTE] Running PureCLIP")
             call.peakcalling_pureclip(args.input_signal_bam, args.input_signal_bai, args.genome_file,
-                                      args.chr_sizes, args.output_folder, para_dict["PureCLIP"][i], args.threads)
+                                      args.chr_sizes, args.output_folder, args.threads, para_dict["PureCLIP"][i])
 
             print("[NOTE] Running Piranha")
             call.peakcalling_piranha(args.input_signal_bam, args.output_folder,
@@ -299,8 +299,8 @@ print("[NOTE] Execute peak calling with best or chosen parameter set.")
 if( bool_control == 0 ):
     print("[NOTE] Running PureCLIP")
     call_ctl.peakcalling_pureclip(args.input_signal_bam, args.input_signal_bai, args.input_control_bam,
-                                  args.input_control_bai, args.genome_file, args.chr_sizes, args.output_folder,
-                                  final_parameterset_dict["PureCLIP"], args.threads)
+                                  args.input_control_bai, args.genome_file, args.chr_sizes, args.output_folder, args.threads,
+                                  final_parameterset_dict["PureCLIP"])
 
     print("[NOTE] Running Piranha")
     call_ctl.peakcalling_piranha(args.input_signal_bam, args.input_control_bam,
@@ -312,8 +312,7 @@ if( bool_control == 0 ):
 else:
     print("[NOTE] Running PureCLIP")
     call.peakcalling_pureclip(args.input_signal_bam, args.input_signal_bai, args.genome_file,
-                              args.chr_sizes, args.output_folder, final_parameterset_dict["PureCLIP"],
-                              args.threads)
+                              args.chr_sizes, args.output_folder, args.threads, final_parameterset_dict["PureCLIP"])
 
     print("[NOTE] Running Piranha")
     call.peakcalling_piranha(args.input_signal_bam, args.output_folder,
