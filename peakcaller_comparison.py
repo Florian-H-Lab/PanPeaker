@@ -283,6 +283,10 @@ def idr(outputpath, seed, num_pools, threads, num_replicates):
         if( Nt_dict[key] == 1 and not all(v == 0 for v in Np_Nt_dict[key]) ):
             false_peaks.append(key)
 
+    if ( len(false_peaks) == 0 ):
+        if ( Nt_dict[key] == 1 ):
+            false_peaks.append(key)
+
     ## Np/Nt < p-val
     ## A robust peak should have a high quotient
     print("[NOTE] Calculate p-value")
@@ -338,7 +342,7 @@ def idr(outputpath, seed, num_pools, threads, num_replicates):
         # represents a higher and more robust peaks.
         if ( mean_dict[key] >= mu_means_false ):
         #    all_pvals_dict[key] = (sci.ttest_ind(Np_Nt_dict[key], casted_list_means_false)[1])/2
-            true_pvals_dict[key] = (sci.ttest_ind(numpy.log1p(Np_Nt_dict[key]), log_casted_list_means_false)[1])/2
+            true_pvals_dict[key] = (sci.ranksums(numpy.log1p(Np_Nt_dict[key]), log_casted_list_means_false)[1])/2
         #else:
         #    all_pvals_dict[key] = 1.0
 

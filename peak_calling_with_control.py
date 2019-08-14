@@ -7,7 +7,7 @@ def ensure_dir(file_path):
         os.mkdir(file_path)
 
 def peakcalling_pureclip(signal_bam, signal_bai, ctl_bam, ctl_bai, genome_fa, chr_sizes,
-                         outputpath, pureclip_par, threads):
+                         outputpath, threads, pureclip_par):
 
     outputpath_pureclip = outputpath + "/pureclip"
     ensure_dir(outputpath_pureclip)
