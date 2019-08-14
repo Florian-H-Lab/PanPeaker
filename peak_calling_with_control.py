@@ -16,19 +16,18 @@ def peakcalling_pureclip(signal_bam, signal_bai, ctl_bam, ctl_bai, genome_fa, ch
     # binding binding regions with PureCLIP. Use binding regions as peaks.
     print("... do PureCLIP")
     for i in range(0, len(signal_bam)):
-        for j in range(0, len(ctl_bam)):
 
-            signal_name = signal_bam[i].split("/").pop()
-            ctl_name = ctl_bam[j].split("/").pop()
+        signal_name = signal_bam[i].split("/").pop()
+        ctl_name = ctl_bam[i].split("/").pop()
 
-            crosslinks_file = "{}/{}_vs_{}_crosslinkind_sites.bed".format(outputpath_pureclip, signal_name, ctl_name)
-            binding_regions = "{}/{}_vs_{}_binding_regions.bed".format(outputpath_pureclip, signal_name, ctl_name)
-            pureclip_parameter_file = "{}/{}_vs_{}_parameters.txt".format(outputpath_pureclip, signal_name, ctl_name)
+        crosslinks_file = "{}/{}_vs_{}_crosslinkind_sites.bed".format(outputpath_pureclip, signal_name, ctl_name)
+        binding_regions = "{}/{}_vs_{}_binding_regions.bed".format(outputpath_pureclip, signal_name, ctl_name)
+        pureclip_parameter_file = "{}/{}_vs_{}_parameters.txt".format(outputpath_pureclip, signal_name, ctl_name)
 
-            sb.Popen("pureclip -i {} -bai {} -ibam {} -ibai {} -g {} -o {} -or {} -p {} -nt {} {}".format(
-                signal_bam[i], signal_bai[i], ctl_bam[j], ctl_bai[j], genome_fa, crosslinks_file, binding_regions,
-                pureclip_parameter_file, threads, pureclip_par
-            ), shell=True).wait()
+        sb.Popen("pureclip -i {} -bai {} -ibam {} -ibai {} -g {} -o {} -or {} -p {} -nt {} {}".format(
+            signal_bam[i], signal_bai[i], ctl_bam[i], ctl_bai[i], genome_fa, crosslinks_file, binding_regions,
+            pureclip_parameter_file, threads, pureclip_par
+        ), shell=True).wait()
 
     print("... edit results")
 
